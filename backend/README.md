@@ -46,14 +46,21 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Create a `.env` file or set these environment variables in your deployment platform:
+Create a `backend/.env` file, a repository-root `.env` file, or set these
+environment variables in your deployment platform:
 
 ```env
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_JWT_AUDIENCE=authenticated
 SUPABASE_JWT_SECRET=your-jwt-secret-if-using-HS256
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 ```
+
+`DATABASE_URL` may use `postgres://`, `postgresql://`,
+`postgresql+psycopg://`, or `postgresql+psycopg2://`. Bare PostgreSQL URLs
+are normalized to the SQLAlchemy `psycopg` driver, and non-local database
+hosts use `sslmode=require` unless the URL already specifies an SSL mode.
 
 `SUPABASE_JWT_SECRET` is only required for legacy HS256 JWT projects. For asymmetric JWTs, the backend validates tokens through the Supabase JWKS endpoint.
 
@@ -141,7 +148,7 @@ POST   /api/companies/{company_id}/opportunities
 
 Rules:
 
-- Companies are represented by rows in `users` where `role = 'company'`.
+- Companies are represented by rows in `company_profiles`, keyed by `user_id`.
 - Company listing supports `industry` and `location` filters.
 - Only a company user can create opportunities.
 - Company users can only create opportunities for their own user id.
@@ -188,6 +195,24 @@ Recommended constraints/indexes:
 - `email` unique
 - `role` check: `student`, `professor`, `company`, `admin`
 - index on `role`
+
+### company_profiles
+
+Required columns:
+
+- `user_id UUID PRIMARY KEY REFERENCES users(id)`
+- `company_name TEXT/VARCHAR NULL`
+- `industry TEXT/VARCHAR NULL`
+- `location TEXT/VARCHAR NULL`
+- `website TEXT NULL`
+- `description TEXT NULL`
+- `interests TEXT[] NULL`
+- `total_opportunities INTEGER NOT NULL DEFAULT 0`
+- `hired_students INTEGER NOT NULL DEFAULT 0`
+- `active_projects INTEGER NOT NULL DEFAULT 0`
+- `profile_views INTEGER NOT NULL DEFAULT 0`
+- `created_at TIMESTAMPTZ NULL`
+- `updated_at TIMESTAMPTZ NULL`
 
 ### projects
 

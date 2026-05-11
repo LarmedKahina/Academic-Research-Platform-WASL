@@ -121,6 +121,7 @@ def create_company_opportunity(
         description=payload.description,
         type=payload.type,
         skills=payload.skills,
+        location=payload.location,
         deadline=payload.deadline,
         status="open",
     )
@@ -235,6 +236,7 @@ def _serialize_opportunity(
         "description": opportunity.description,
         "type": opportunity.type,
         "skills": opportunity.skills or [],
+        "location": opportunity.location,
         "status": opportunity.status,
         "deadline": opportunity.deadline,
         "created_at": opportunity.created_at,

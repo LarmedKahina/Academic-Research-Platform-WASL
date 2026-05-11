@@ -82,5 +82,5 @@ def create_company_opportunity(
         skills=payload.skills,
         location=payload.location,
         deadline=payload.deadline,
-        status_value=payload.status,
+        status_value="open",
     )

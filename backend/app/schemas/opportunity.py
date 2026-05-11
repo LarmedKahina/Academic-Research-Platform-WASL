@@ -12,6 +12,7 @@ class OpportunityCreate(BaseModel):
     description: str | None = None
     type: OpportunityType
     skills: list[str] = []
+    location: str | None = None
     deadline: date | None = None
 
 
@@ -20,6 +21,7 @@ class OpportunityUpdate(BaseModel):
     description: str | None = None
     type: OpportunityType | None = None
     skills: list[str] | None = None
+    location: str | None = None
     deadline: date | None = None
     status: str | None = None
 
@@ -34,6 +36,7 @@ class OpportunityResponse(BaseModel):
     description: str | None = None
     type: str
     skills: list[str] = []
+    location: str | None = None
     status: str
     deadline: date | None = None
     created_at: datetime | None = None
