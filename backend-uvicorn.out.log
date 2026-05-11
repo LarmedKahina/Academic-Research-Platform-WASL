@@ -1,0 +1,15 @@
+INFO:     127.0.0.1:60828 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60828 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59443 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63688 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63688 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63688 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63686 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63686 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53325 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53325 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57560 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50872 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55114 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63677 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61058 - "GET / HTTP/1.1" 404 Not Found
