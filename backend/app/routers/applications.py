@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, text
@@ -41,6 +41,12 @@ def apply_to_opportunity(
         if opportunity is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
+        if opportunity.status != "open":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This opportunity is not open for applications",
+            )
+
         duplicate = db.scalar(
             select(Application.id).where(
                 Application.opportunity_id == opportunity_id,
@@ -49,6 +55,12 @@ def apply_to_opportunity(
         )
         if duplicate is not None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already exists")
+
+        if _opportunity_deadline_passed(opportunity):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This opportunity is no longer accepting applications",
+            )
 
         student = db.get(User, current_user.id)
         student_name = _student_name(student, current_user)
@@ -165,7 +177,9 @@ def update_application_status(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
         application, opportunity, student = row
-        if current_user.role != "company" or opportunity.company_id != current_user.id:
+        if current_user.role != "admin" and (
+            current_user.role != "company" or opportunity.company_id != current_user.id
+        ):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
         application.status = payload.status
@@ -193,6 +207,16 @@ def update_application_status(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database error",
         ) from exc
+
+
+def _opportunity_deadline_passed(opportunity: Opportunity) -> bool:
+    dl = opportunity.deadline
+    if dl is None:
+        return False
+    now = datetime.now(timezone.utc)
+    if dl.tzinfo is None:
+        return now > dl.replace(tzinfo=timezone.utc)
+    return now > dl
 
 
 def _create_notification(

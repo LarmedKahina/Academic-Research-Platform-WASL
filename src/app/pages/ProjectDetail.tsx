@@ -13,9 +13,11 @@ import { addComment, deleteComment, getComments, updateComment } from '../../ser
 import { checkSaved, saveProject, unsaveProject } from '../../services/savedProjectsService';
 import { getProject } from '../../services/projectsService';
 import { getErrorMessage } from '../../services/errors';
+import { useAuth } from '../contexts/AuthContext';
 
 type CommentItem = {
   id: string;
+  user_id?: string;
   content?: string;
   comment?: string;
   user_name?: string;
@@ -23,20 +25,8 @@ type CommentItem = {
   created_at?: string;
 };
 
-const fallbackReviews: CommentItem[] = [
-  {
-    id: 'r1',
-    user_name: 'Prof. Karim Mansouri',
-    content: 'Excellent work with practical applications. The model accuracy is impressive.',
-    created_at: 'March 20, 2026',
-  },
-  {
-    id: 'r2',
-    user_name: 'Dr. Amina Benali',
-    content: 'Strong technical implementation. Consider expanding the dataset.',
-    created_at: 'March 18, 2026',
-  },
-];
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 
 type Project = {
   id: string;
@@ -49,16 +39,21 @@ type Project = {
 
 export const ProjectDetail = () => {
   const { id } = useParams();
-  const projectId = id || '1';
-  const [comments, setComments] = useState<CommentItem[]>(fallbackReviews);
+  const { user } = useAuth();
+  const projectId = id ?? '';
+  const [comments, setComments] = useState<CommentItem[]>([]);
   const [commentText, setCommentText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
   const [saved, setSaved] = useState(false);
-  const [averageRating, setAverageRating] = useState(4.8);
+  const [averageRating, setAverageRating] = useState(0);
   const [project, setProject] = useState<Project | null>(null);
 
+  const canRateOrComment = Boolean(user && (user.role === 'student' || user.role === 'admin'));
+
   useEffect(() => {
+    if (!projectId || !isUuid(projectId)) return;
+
     const loadProjectActivity = async () => {
       try {
         const [ratingsResponse, commentsResponse, savedResponse] = await Promise.all([
@@ -67,7 +62,9 @@ export const ProjectDetail = () => {
           checkSaved(projectId),
         ]);
         const ratingsData = ratingsResponse.data;
-        setAverageRating(ratingsData.avg_rating ?? ratingsData.average ?? ratingsData.avg ?? averageRating);
+        setAverageRating(
+          Number(ratingsData.avg_rating ?? ratingsData.average ?? ratingsData.avg ?? 0),
+        );
         setComments(commentsResponse.data.comments ?? commentsResponse.data ?? []);
         setSaved(Boolean(savedResponse.data.saved));
       } catch (error) {
@@ -79,7 +76,7 @@ export const ProjectDetail = () => {
       try {
         const response = await getProject(projectId);
         setProject(response.data);
-        setAverageRating(Number(response.data.avg_rating ?? averageRating));
+        setAverageRating(Number(response.data.avg_rating ?? 0));
       } catch (error) {
         toast.error(getErrorMessage(error));
       }
@@ -151,6 +148,20 @@ export const ProjectDetail = () => {
       toast.error(getErrorMessage(error, 'Project is already saved'));
     }
   };
+
+  if (!projectId || !isUuid(projectId)) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="container mx-auto px-4 max-w-2xl">
+          <Card>
+            <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
+              Invalid project link. <Link to="/browse" className="text-[#f97316] hover:underline">Browse projects</Link>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -249,13 +260,33 @@ export const ProjectDetail = () => {
             <div className="mb-8 space-y-4">
               <div className="flex flex-wrap gap-2">
                 {[1, 2, 3, 4, 5].map((rating) => (
-                  <Button key={rating} variant="outline" size="sm" onClick={() => handleRating(rating)}>
+                  <Button
+                    key={rating}
+                    variant="outline"
+                    size="sm"
+                    disabled={!canRateOrComment}
+                    onClick={() => handleRating(rating)}
+                  >
                     {rating} <Star className="w-4 h-4 ml-1 text-[#f97316] fill-current" />
                   </Button>
                 ))}
               </div>
-              <Textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder="Add a comment..." />
-              <Button onClick={handleAddComment} className="bg-[#f97316] hover:bg-[#ea580c]">Post Comment</Button>
+              {!canRateOrComment && (
+                <p className="text-sm text-muted-foreground">Sign in as a student to rate and comment.</p>
+              )}
+              <Textarea
+                value={commentText}
+                onChange={(event) => setCommentText(event.target.value)}
+                placeholder="Add a comment..."
+                disabled={!canRateOrComment}
+              />
+              <Button
+                onClick={handleAddComment}
+                className="bg-[#f97316] hover:bg-[#ea580c]"
+                disabled={!canRateOrComment}
+              >
+                Post Comment
+              </Button>
             </div>
 
             <div className="space-y-6">
@@ -284,10 +315,12 @@ export const ProjectDetail = () => {
                         ) : (
                           <>
                             <p className="text-muted-foreground">{content}</p>
-                            <div className="mt-3 flex gap-2">
-                              <Button size="sm" variant="outline" onClick={() => { setEditingId(comment.id); setEditingText(content); }}>Edit</Button>
-                              <Button size="sm" variant="outline" onClick={() => handleDeleteComment(comment.id)}>Delete</Button>
-                            </div>
+                            {user && comment.user_id === user.id && (
+                              <div className="mt-3 flex gap-2">
+                                <Button size="sm" variant="outline" onClick={() => { setEditingId(comment.id); setEditingText(content); }}>Edit</Button>
+                                <Button size="sm" variant="outline" onClick={() => handleDeleteComment(comment.id)}>Delete</Button>
+                              </div>
+                            )}
                           </>
                         )}
                       </div>

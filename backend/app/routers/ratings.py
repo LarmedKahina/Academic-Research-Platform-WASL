@@ -47,6 +47,12 @@ def save_project_rating(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> Rating:
+    if current_user.role not in ("student", "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can rate projects",
+        )
+
     _ensure_project_exists(db, project_id)
 
     rating = db.scalar(
@@ -79,10 +85,16 @@ def update_rating(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> Rating:
+    if current_user.role not in ("student", "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can update ratings",
+        )
+
     rating = db.get(Rating, rating_id)
     if rating is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rating not found")
-    if rating.user_id != current_user.id:
+    if rating.user_id != current_user.id and current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the rating owner can update this rating",

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -8,6 +8,7 @@ import { Building2, MapPin, Globe, Briefcase, BarChart3, Bell, Settings, Users, 
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { useAuth } from '../contexts/AuthContext';
 import { createOpportunity, getCompany, getCompanyOpportunities } from '../../services/companiesService';
@@ -43,7 +44,8 @@ export const CompanyProfile = () => {
   });
   const { user } = useAuth();
   const { id } = useParams();
-  const companyId = id || user?.id || 'c1';
+  const companyId = id ?? user?.id ?? '';
+  const isOwnCompany = Boolean(user?.role === 'company' && companyId && user.id === companyId);
 
   const fallbackCompany = {
     id: 'c1',
@@ -110,6 +112,8 @@ export const CompanyProfile = () => {
   };
 
   useEffect(() => {
+    if (!companyId) return;
+
     const loadCompany = async () => {
       try {
         const [companyResponse, opportunitiesResponse] = await Promise.all([
@@ -120,24 +124,28 @@ export const CompanyProfile = () => {
         setCompanyData(companyResponse.data);
         setOpportunities(loadedOpportunities);
 
-        const applicationEntries = await Promise.all(
-          loadedOpportunities.map(async (opportunity: Opportunity) => {
-            try {
-              const response = await getApplicationsForOpportunity(opportunity.id);
-              return [opportunity.id, response.data] as const;
-            } catch {
-              return [opportunity.id, []] as const;
-            }
-          }),
-        );
-        setApplicationsByOpportunity(Object.fromEntries(applicationEntries));
+        if (isOwnCompany) {
+          const applicationEntries = await Promise.all(
+            loadedOpportunities.map(async (opportunity: Opportunity) => {
+              try {
+                const response = await getApplicationsForOpportunity(opportunity.id);
+                return [opportunity.id, response.data] as const;
+              } catch {
+                return [opportunity.id, []] as const;
+              }
+            }),
+          );
+          setApplicationsByOpportunity(Object.fromEntries(applicationEntries));
+        } else {
+          setApplicationsByOpportunity({});
+        }
       } catch (error) {
         toast.error(getErrorMessage(error));
       }
     };
 
     loadCompany();
-  }, [companyId]);
+  }, [companyId, isOwnCompany]);
 
   const handlePostOpportunity = async () => {
     if (!newOpportunity.title.trim()) return;
@@ -172,6 +180,19 @@ export const CompanyProfile = () => {
       toast.error(getErrorMessage(error));
     }
   };
+
+  if (!companyId) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
+        <Card className="max-w-md w-full text-center">
+          <CardContent className="pt-8 pb-8 text-muted-foreground">
+            No company selected.{' '}
+            <Link to="/community" className="text-[#f97316] hover:underline">Browse the community</Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -353,7 +374,7 @@ export const CompanyProfile = () => {
               </TabsContent>
 
               <TabsContent value="opportunities" className="space-y-6">
-                {user?.role === 'company' && (
+                {isOwnCompany && (
                   <Card>
                     <CardHeader>
                       <CardTitle>Post New Opportunity</CardTitle>
@@ -365,11 +386,19 @@ export const CompanyProfile = () => {
                         placeholder="Opportunity title"
                       />
                       <div className="grid md:grid-cols-2 gap-3">
-                        <Input
+                        <Select
                           value={newOpportunity.type}
-                          onChange={(event) => setNewOpportunity((current) => ({ ...current, type: event.target.value }))}
-                          placeholder="internship, pfe, or collaboration"
-                        />
+                          onValueChange={(value) => setNewOpportunity((current) => ({ ...current, type: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="internship">Internship</SelectItem>
+                            <SelectItem value="pfe">PFE</SelectItem>
+                            <SelectItem value="collaboration">Collaboration</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <Input
                           value={newOpportunity.skills}
                           onChange={(event) => setNewOpportunity((current) => ({ ...current, skills: event.target.value }))}
@@ -406,8 +435,16 @@ export const CompanyProfile = () => {
                             ))}
                           </div>
                         </div>
-                        <Badge className={opportunity.status === 'Open' ? 'bg-green-500 text-white' : 'bg-[#f97316] text-white'}>
-                          {opportunity.status}
+                        <Badge
+                          className={
+                            (opportunity.status ?? '').toLowerCase() === 'open'
+                              ? 'bg-green-500 text-white'
+                              : 'bg-[#f97316] text-white'
+                          }
+                        >
+                          {opportunity.status
+                            ? opportunity.status.charAt(0).toUpperCase() + opportunity.status.slice(1).toLowerCase()
+                            : 'Open'}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-4 text-sm text-gray-600">
@@ -416,7 +453,7 @@ export const CompanyProfile = () => {
                           {applicationsByOpportunity[opportunity.id]?.length ?? opportunity.applicants ?? 0} applicants
                         </span>
                       </div>
-                      {user?.role === 'company' && (
+                      {isOwnCompany && (
                         <div className="mt-5 space-y-3">
                           {(applicationsByOpportunity[opportunity.id] ?? []).map((application) => (
                             <div key={application.id} className="rounded-md border p-3">

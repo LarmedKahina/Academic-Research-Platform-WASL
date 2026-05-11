@@ -63,6 +63,12 @@ def update_company(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, object]:
+    if current_user.role != "company":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only company accounts can update company profiles",
+        )
+
     if current_user.id != company_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

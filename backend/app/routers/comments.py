@@ -54,6 +54,12 @@ def create_project_comment(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, object]:
+    if current_user.role != "student":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can post comments",
+        )
+
     _ensure_project_exists(db, project_id)
 
     comment = Comment(
@@ -62,10 +68,10 @@ def create_project_comment(
         content=payload.content,
     )
     db.add(comment)
+    db.flush()
+    _create_comment_notification(db, project_id, current_user)
     db.commit()
     db.refresh(comment)
-
-    _create_comment_notification(db, project_id, current_user)
 
     comment_with_user = _get_comment_with_user(db, comment.id)
     if comment_with_user is None:
@@ -134,15 +140,14 @@ def _create_comment_notification(
     project_id: uuid.UUID,
     current_user: CurrentUser,
 ) -> None:
-    try:
-        project_owner_id = db.execute(
-            text("SELECT user_id FROM projects WHERE id = :project_id"),
-            {"project_id": project_id},
-        ).scalar_one_or_none()
-        if project_owner_id is None or str(project_owner_id) == str(current_user.id):
-            return
+    project = db.get(Project, project_id)
+    if project is None or project.user_id is None:
+        return
+    if project.user_id == current_user.id:
+        return
 
-        commenter = current_user.email or "Someone"
+    commenter = current_user.email or "Someone"
+    try:
         db.execute(
             text(
                 """
@@ -151,14 +156,14 @@ def _create_comment_notification(
                 """
             ),
             {
-                "user_id": project_owner_id,
+                "user_id": project.user_id,
                 "content": f"{commenter} commented on your project",
                 "link": f"/projects/{project_id}",
             },
         )
-        db.commit()
     except SQLAlchemyError:
         db.rollback()
+        raise
 
 
 def _serialize_comment(comment: Comment) -> dict[str, object]:

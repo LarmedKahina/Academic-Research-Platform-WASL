@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -8,8 +9,9 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Briefcase, Building2, Search } from 'lucide-react';
 import { getOpportunities } from '../../services/companiesService';
-import { applyToOpportunity } from '../../services/applicationsService';
+import { applyToOpportunity, getMyApplications } from '../../services/applicationsService';
 import { getErrorMessage } from '../../services/errors';
+import { useAuth } from '../contexts/AuthContext';
 
 type Opportunity = {
   id: string;
@@ -21,8 +23,18 @@ type Opportunity = {
   company_name?: string;
 };
 
+type MyApplication = {
+  id: string;
+  opportunity_title: string;
+  company_name?: string | null;
+  status: string;
+  created_at?: string;
+};
+
 export const Opportunities = () => {
+  const { user } = useAuth();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [myApplications, setMyApplications] = useState<MyApplication[]>([]);
   const [type, setType] = useState('all');
   const [skills, setSkills] = useState('');
   const [messageByOpportunity, setMessageByOpportunity] = useState<Record<string, string>>({});
@@ -44,10 +56,28 @@ export const Opportunities = () => {
     loadOpportunities();
   }, [type, skills]);
 
+  useEffect(() => {
+    if (!user || user.role !== 'student') {
+      setMyApplications([]);
+      return;
+    }
+    const loadMine = async () => {
+      try {
+        const response = await getMyApplications();
+        setMyApplications(response.data ?? []);
+      } catch {
+        setMyApplications([]);
+      }
+    };
+    loadMine();
+  }, [user]);
+
   const handleApply = async (opportunityId: string) => {
     try {
       await applyToOpportunity(opportunityId, messageByOpportunity[opportunityId]);
       toast.success('Application sent');
+      const response = await getMyApplications();
+      setMyApplications(response.data ?? []);
     } catch (error) {
       toast.error(getErrorMessage(error, 'You already applied'));
     }
@@ -85,6 +115,25 @@ export const Opportunities = () => {
       </section>
 
       <main className="container mx-auto px-6 py-10">
+        {user?.role === 'student' && myApplications.length > 0 && (
+          <Card className="mb-10 border border-[#1e293b]/10">
+            <CardHeader>
+              <CardTitle>My applications</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {myApplications.map((application) => (
+                <div key={application.id} className="flex flex-wrap items-center justify-between gap-2 border-b pb-3 last:border-0">
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{application.opportunity_title}</div>
+                    <div className="text-sm text-muted-foreground">{application.company_name ?? 'Company'}</div>
+                  </div>
+                  <Badge variant="outline">{application.status}</Badge>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid gap-6">
           {opportunities.map((opportunity) => (
             <Card key={opportunity.id} className="border-l-4 border-l-[#f97316]">
@@ -118,8 +167,21 @@ export const Opportunities = () => {
                     [opportunity.id]: event.target.value,
                   }))}
                   placeholder="Optional cover message"
+                  disabled={!user || user.role !== 'student'}
                 />
-                <Button onClick={() => handleApply(opportunity.id)} className="bg-[#f97316] hover:bg-[#ea580c]">
+                {!user && (
+                  <p className="text-sm text-muted-foreground">
+                    <Link to="/login" className="text-[#f97316] hover:underline">Sign in</Link> as a student to apply.
+                  </p>
+                )}
+                {user && user.role !== 'student' && (
+                  <p className="text-sm text-muted-foreground">Only student accounts can apply to opportunities.</p>
+                )}
+                <Button
+                  onClick={() => handleApply(opportunity.id)}
+                  className="bg-[#f97316] hover:bg-[#ea580c]"
+                  disabled={!user || user.role !== 'student'}
+                >
                   Apply
                 </Button>
               </CardContent>

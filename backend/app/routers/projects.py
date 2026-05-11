@@ -72,6 +72,8 @@ def get_project(
 def _serialize_project(project: Project) -> dict[str, object]:
     return {
         "id": project.id,
+        "user_id": project.user_id,
+        "supervisor_id": project.supervisor_id,
         "title": project.title,
         "description": project.description,
         "avg_rating": float(project.avg_rating or 0),
